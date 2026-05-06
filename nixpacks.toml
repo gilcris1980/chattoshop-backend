@@ -1,2 +1,4 @@
 [phases.setup]
 nixPkgs = ["php83", "nodejs_22"]
+
+providers = ["php"]
