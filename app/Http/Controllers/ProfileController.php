@@ -67,8 +67,8 @@ class ProfileController extends Controller
             return response()->json(['message' => 'Current password is incorrect'], 400);
         }
 
-        $user->update([
-            'password' => $request->password,
+$user->update([
+            'password' => Hash::make($request->password),
         ]);
 
         $user->tokens()->delete();

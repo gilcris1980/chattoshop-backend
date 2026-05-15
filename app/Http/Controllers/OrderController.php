@@ -16,7 +16,7 @@ class OrderController extends Controller
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isAdmin()) {
             $orders = Order::with(['user', 'items.product'])
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
@@ -61,6 +61,13 @@ class OrderController extends Controller
             if ($product->stock < $item['quantity']) {
                 return response()->json([
                     'message' => "Insufficient stock for product: {$product->name}"
+                ], 400);
+            }
+
+            // Check if user is buying their own product
+            if ($product->seller_id === $request->user()->id) {
+                return response()->json([
+                    'message' => "You cannot purchase your own product: {$product->name}"
                 ], 400);
             }
 
@@ -113,14 +120,33 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
+        $user = $request->user();
         $order = Order::findOrFail($id);
-
+        
+        // Order status flow: pending → processing → shipped → delivered → completed
+        $allowedStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'];
+        
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,approved,shipped,completed,cancelled',
+            'status' => 'required|in:' . implode(',', $allowedStatuses),
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+        
+        if ($user->role === 'customer') {
+            return response()->json(['message' => 'Customers cannot update order status'], 403);
+        }
+        
+        if ($user->isSeller()) {
+            $sellerProductIds = Product::where('seller_id', $user->id)->pluck('id');
+            $orderHasSellerProducts = OrderItem::where('order_id', $order->id)
+                ->whereIn('product_id', $sellerProductIds)
+                ->exists();
+            
+            if (!$orderHasSellerProducts) {
+                return response()->json(['message' => 'Unauthorized - This order does not contain your products'], 403);
+            }
         }
 
         $oldStatus = $order->status;
@@ -128,8 +154,9 @@ class OrderController extends Controller
 
         if ($request->status !== $oldStatus) {
             $statusMessages = [
-                'approved' => 'Your order has been approved',
+                'processing' => 'Your order is being processed',
                 'shipped' => 'Your order has been shipped',
+                'delivered' => 'Your order has been delivered',
                 'completed' => 'Your order has been completed',
                 'cancelled' => 'Your order has been cancelled',
             ];
@@ -160,12 +187,14 @@ class OrderController extends Controller
     {
         $order = Order::findOrFail($id);
 
+        // Only the order owner can cancel
         if ($order->user_id !== request()->user()->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        // Only pending orders can be cancelled by customer
         if ($order->status !== 'pending') {
-            return response()->json(['message' => 'Cannot cancel order with status: ' . $order->status], 400);
+            return response()->json(['message' => 'Cannot cancel order with status: ' . $order->status . '. Only pending orders can be cancelled.'], 400);
         }
 
         $order->update(['status' => 'cancelled']);
@@ -195,14 +224,38 @@ class OrderController extends Controller
         ]);
     }
 
+    public function allStats(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        
+        return response()->json([
+            'total_orders' => Order::count(),
+            'total_revenue' => Order::whereIn('status', ['delivered', 'completed'])->sum('total_amount'),
+            'pending_orders' => Order::where('status', 'pending')->count(),
+            'status_breakdown' => [
+                'pending' => Order::where('status', 'pending')->count(),
+                'processing' => Order::where('status', 'processing')->count(),
+                'shipped' => Order::where('status', 'shipped')->count(),
+                'delivered' => Order::where('status', 'delivered')->count(),
+                'completed' => Order::where('status', 'completed')->count(),
+                'cancelled' => Order::where('status', 'cancelled')->count(),
+            ],
+            'recent_orders' => Order::with('user')->latest()->limit(10)->get(),
+        ]);
+    }
+
     public function stats(Request $request)
     {
         $user = $request->user();
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isAdmin()) {
             return response()->json([
                 'total_orders' => Order::count(),
-                'total_sales' => Order::where('status', 'completed')->sum('total_amount'),
+                'total_sales' => Order::whereIn('status', ['delivered', 'completed'])->sum('total_amount'),
                 'pending_orders' => Order::where('status', 'pending')->count(),
                 'recent_orders' => Order::with('user')->latest()->limit(5)->get(),
             ]);
@@ -223,7 +276,7 @@ class OrderController extends Controller
 
         return response()->json([
             'total_orders' => Order::where('user_id', $user->id)->count(),
-            'total_spent' => Order::where('user_id', $user->id)->where('status', 'completed')->sum('total_amount'),
+            'total_spent' => Order::where('user_id', $user->id)->whereIn('status', ['delivered', 'completed'])->sum('total_amount'),
         ]);
     }
 }

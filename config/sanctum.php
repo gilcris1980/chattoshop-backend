@@ -5,7 +5,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Laravel\Sanctum\Sanctum;
 
-$statefulDomains = array_filter(explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost,localhost:3000,127.0.0.1,127.0.0.1:3000,127.0.0.1:8000,::1')));
+$statefulDomains = explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost,localhost:5500,127.0.0.1,127.0.0.1:5500,127.0.0.1:8000,::1'));
 
 return [
 
@@ -20,7 +20,14 @@ return [
     |
     */
 
-    'stateful' => $statefulDomains,
+    'stateful' => array_merge($statefulDomains, [
+        'localhost',
+        'localhost:5500',
+        '127.0.0.1',
+        '127.0.0.1:5500',
+        '127.0.0.1:8000',
+        '::1',
+    ]),
 
     /*
     |--------------------------------------------------------------------------

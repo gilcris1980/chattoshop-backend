@@ -36,7 +36,7 @@ class ProductController extends Controller
 
         $sortBy = $request->sort ?? 'created_at';
         $sortDir = $request->order ?? 'desc';
-        
+
         if (in_array($sortBy, ['price', 'created_at', 'name'])) {
             $query->orderBy($sortBy, $sortDir === 'asc' ? 'asc' : 'desc');
         }
@@ -45,6 +45,15 @@ class ProductController extends Controller
 
         return response()->json($products);
     }
+     public function myProducts(Request $request)
+            {
+             $products = Product::with(['seller', 'category'])
+            ->where('seller_id', $request->user()->id)
+            ->latest()
+            ->get();
+
+            return response()->json($products);
+          }
 
     public function store(Request $request)
     {
@@ -91,7 +100,7 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
 
-        if ($request->user()->id !== $product->seller_id && !$request->user()->isSuperAdmin()) {
+        if ($request->user()->id !== $product->seller_id && !$request->user()->isAdmin()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -133,26 +142,67 @@ class ProductController extends Controller
         ]);
     }
 
-    public function destroy($id)
-    {
-        $product = Product::findOrFail($id);
+public function destroy($id)
+{
+
+    $product = Product::find($id);
+
+    if (!$product) {
+
+        return response()->json([
+            'message' => 'Product not found'
+        ], 404);
+
+    }
+
+    $user = auth()->user();
+
+    // ADMIN CAN DELETE ANY PRODUCT
+    if (
+        $user->role === 'system_admin' ||
+        $user->role === 'admin'
+    ) {
 
         if ($product->image) {
-            Storage::disk('public')->delete($product->image);
+
+            Storage::disk('public')
+                ->delete($product->image);
+
         }
 
         $product->delete();
 
-        return response()->json(['message' => 'Product deleted successfully']);
+        return response()->json([
+            'message' => 'Product deleted successfully'
+        ]);
+
     }
 
-    public function myProducts(Request $request)
-    {
-        $products = Product::with(['category'])
-            ->where('seller_id', $request->user()->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+    // SELLER CAN DELETE OWN PRODUCT
+    if (
+        $user->role === 'seller' &&
+        $product->seller_id == $user->id
+    ) {
 
-        return response()->json($products);
+        if ($product->image) {
+
+            Storage::disk('public')
+                ->delete($product->image);
+
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'message' => 'Product deleted successfully'
+        ]);
+
     }
+
+    return response()->json([
+        'message' => 'Unauthorized'
+    ], 403);
+
+}
+
 }

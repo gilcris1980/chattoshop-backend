@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, HasApiTokens;
+    use HasFactory, HasApiTokens, Notifiable;
 
     protected $fillable = [
         'name', 'email', 'password', 'role', 'phone', 'address', 'avatar'
@@ -24,12 +25,19 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
         ];
     }
 
-    public function isSuperAdmin(): bool
+    public function isSystemAdmin(): bool
     {
-        return $this->role === 'super_admin';
+        return $this->role === 'system_admin';
+    }
+
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, ['system_admin', 'admin']);
     }
 
     public function isSeller(): bool

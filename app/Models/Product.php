@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Product extends Model
 {
     protected $fillable = [
-        'seller_id', 'category_id', 'name', 'slug', 
+        'seller_id', 'category_id', 'name', 'slug',
         'description', 'price', 'stock', 'image', 'status'
     ];
 
@@ -32,5 +32,10 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function getOrderItemsCountAttribute()
+    {
+        return $this->orderItems()->count();
     }
 }
