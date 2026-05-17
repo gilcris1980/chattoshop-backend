@@ -150,7 +150,11 @@ class OrderController extends Controller
         }
 
         $oldStatus = $order->status;
-        $order->update(['status' => $request->status]);
+
+       \Log::info($request->all());
+
+        $order->status = $request->status;
+        $order->save();
 
         if ($request->status !== $oldStatus) {
             $statusMessages = [

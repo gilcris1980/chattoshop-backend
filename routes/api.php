@@ -37,11 +37,6 @@ Route::get('/categories', [CategoryController::class, 'index']);
 
 Route::get('/products', [ProductController::class, 'index']);
 
-// IMPORTANT:
-// /products/my MUST BE BEFORE /products/{id}
-
-Route::get('/products/{id}', [ProductController::class, 'show']);
-
 /*
 |--------------------------------------------------------------------------
 | PROTECTED ROUTES
@@ -49,6 +44,9 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 */
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
 
     /*
     |--------------------------------------------------------------------------
@@ -78,7 +76,14 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
+    // IMPORTANT:
+    // specific route first
+
     Route::get('/products/my', [ProductController::class, 'myProducts']);
+
+    // dynamic route last
+
+    Route::get('/products/{id}', [ProductController::class, 'show']);
 
     Route::post('/products', [ProductController::class, 'store'])
         ->middleware('role:seller,system_admin,admin');
@@ -115,8 +120,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
 
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
