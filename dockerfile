@@ -29,8 +29,7 @@ RUN composer install --no-dev --optimize-autoloader
 
 # Laravel cache clear
 RUN php artisan config:clear && \
-    php artisan route:clear && \
-    php artisan view:clear
+    php artisan route:clear
 
 # Permissions
 RUN chmod -R 775 storage bootstrap/cache
