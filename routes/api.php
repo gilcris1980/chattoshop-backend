@@ -32,10 +32,20 @@ Route::get('/', function () {
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
-// PUBLIC PRODUCTS & CATEGORIES
+/*
+|--------------------------------------------------------------------------
+| PUBLIC PRODUCTS & CATEGORIES
+|--------------------------------------------------------------------------
+*/
+
+// PUBLIC CATEGORIES
 Route::get('/categories', [CategoryController::class, 'index']);
 
+// PUBLIC PRODUCTS
 Route::get('/products', [ProductController::class, 'index']);
+
+// PUBLIC PRODUCT DETAILS
+Route::get('/products/{id}', [ProductController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -44,9 +54,6 @@ Route::get('/products', [ProductController::class, 'index']);
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
-    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-
 
     /*
     |--------------------------------------------------------------------------
@@ -76,20 +83,17 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    // IMPORTANT:
-    // specific route first
-
+    // SELLER PRODUCTS
     Route::get('/products/my', [ProductController::class, 'myProducts']);
 
-    // dynamic route last
-
-    Route::get('/products/{id}', [ProductController::class, 'show']);
-
+    // CREATE PRODUCT
     Route::post('/products', [ProductController::class, 'store'])
         ->middleware('role:seller,system_admin,admin');
 
+    // UPDATE PRODUCT
     Route::put('/products/{id}', [ProductController::class, 'update']);
 
+    // DELETE PRODUCT
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
     /*
@@ -127,6 +131,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | ORDER STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+
+    /*
+    |--------------------------------------------------------------------------
     | ADMIN ROUTES
     |--------------------------------------------------------------------------
     */
@@ -153,4 +165,5 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/orders/stats/all', [OrderController::class, 'allStats']);
         });
+
 });
