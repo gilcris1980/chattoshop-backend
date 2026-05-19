@@ -6,7 +6,6 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -45,15 +44,16 @@ class ProductController extends Controller
 
         return response()->json($products);
     }
-     public function myProducts(Request $request)
-            {
-             $products = Product::with(['seller', 'category'])
+
+    public function myProducts(Request $request)
+    {
+        $products = Product::with(['seller', 'category'])
             ->where('seller_id', $request->user()->id)
             ->latest()
             ->get();
 
-            return response()->json($products);
-          }
+        return response()->json($products);
+    }
 
     public function store(Request $request)
     {
@@ -68,18 +68,34 @@ class ProductController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        $data = $request->only(['name', 'category_id', 'description', 'price', 'stock', 'status']);
+        $data = $request->only([
+            'name',
+            'category_id',
+            'description',
+            'price',
+            'stock',
+            'status'
+        ]);
+
         $data['slug'] = Str::slug($request->name);
         $data['seller_id'] = $request->user()->id;
 
+        // IMAGE UPLOAD FIX FOR RENDER
         if ($request->hasFile('image')) {
+
             $image = $request->file('image');
+
             $filename = time() . '_' . $image->getClientOriginalName();
-            $path = $image->storeAs('products', $filename, 'public');
-            $data['image'] = $path;
+
+            // SAVE DIRECTLY TO PUBLIC/PRODUCTS
+            $image->move(public_path('products'), $filename);
+
+            $data['image'] = 'products/' . $filename;
         }
 
         $product = Product::create($data);
@@ -92,7 +108,9 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        $product = Product::with(['seller', 'category'])->findOrFail($id);
+        $product = Product::with(['seller', 'category'])
+            ->findOrFail($id);
+
         return response()->json($product);
     }
 
@@ -100,8 +118,13 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
 
-        if ($request->user()->id !== $product->seller_id && !$request->user()->isAdmin()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        if (
+            $request->user()->id !== $product->seller_id &&
+            !$request->user()->isAdmin()
+        ) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -115,23 +138,34 @@ class ProductController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'errors' => $validator->errors()
+            ], 422);
         }
 
-        $data = $request->only(['name', 'category_id', 'description', 'price', 'stock', 'status']);
+        $data = $request->only([
+            'name',
+            'category_id',
+            'description',
+            'price',
+            'stock',
+            'status'
+        ]);
 
         if ($request->name) {
             $data['slug'] = Str::slug($request->name);
         }
 
+        // IMAGE UPDATE FIX
         if ($request->hasFile('image')) {
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
+
             $image = $request->file('image');
+
             $filename = time() . '_' . $image->getClientOriginalName();
-            $path = $image->storeAs('products', $filename, 'public');
-            $data['image'] = $path;
+
+            $image->move(public_path('products'), $filename);
+
+            $data['image'] = 'products/' . $filename;
         }
 
         $product->update($data);
@@ -142,67 +176,47 @@ class ProductController extends Controller
         ]);
     }
 
-public function destroy($id)
-{
+    public function destroy($id)
+    {
+        $product = Product::find($id);
 
-    $product = Product::find($id);
+        if (!$product) {
 
-    if (!$product) {
-
-        return response()->json([
-            'message' => 'Product not found'
-        ], 404);
-
-    }
-
-    $user = auth()->user();
-
-    // ADMIN CAN DELETE ANY PRODUCT
-    if (
-        $user->role === 'system_admin' ||
-        $user->role === 'admin'
-    ) {
-
-        if ($product->image) {
-
-            Storage::disk('public')
-                ->delete($product->image);
-
+            return response()->json([
+                'message' => 'Product not found'
+            ], 404);
         }
 
-        $product->delete();
+        $user = auth()->user();
 
-        return response()->json([
-            'message' => 'Product deleted successfully'
-        ]);
+        // ADMIN DELETE
+        if (
+            $user->role === 'system_admin' ||
+            $user->role === 'admin'
+        ) {
 
-    }
+            $product->delete();
 
-    // SELLER CAN DELETE OWN PRODUCT
-    if (
-        $user->role === 'seller' &&
-        $product->seller_id == $user->id
-    ) {
-
-        if ($product->image) {
-
-            Storage::disk('public')
-                ->delete($product->image);
-
+            return response()->json([
+                'message' => 'Product deleted successfully'
+            ]);
         }
 
-        $product->delete();
+        // SELLER DELETE OWN PRODUCT
+        if (
+            $user->role === 'seller' &&
+            $product->seller_id == $user->id
+        ) {
+
+            $product->delete();
+
+            return response()->json([
+                'message' => 'Product deleted successfully'
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Product deleted successfully'
-        ]);
-
+            'message' => 'Unauthorized'
+        ], 403);
     }
-
-    return response()->json([
-        'message' => 'Unauthorized'
-    ], 403);
-
-}
-
 }
