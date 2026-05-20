@@ -44,6 +44,11 @@ Route::get('/categories', [CategoryController::class, 'index']);
 // PUBLIC PRODUCTS
 Route::get('/products', [ProductController::class, 'index']);
 
+// SELLER PRODUCTS
+// IMPORTANT: DAPAT MAUNA NI SA /products/{id}
+Route::get('/products/my', [ProductController::class, 'myProducts'])
+    ->middleware('auth:sanctum');
+
 // PUBLIC PRODUCT DETAILS
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
@@ -82,9 +87,6 @@ Route::middleware('auth:sanctum')->group(function () {
     | PRODUCTS
     |--------------------------------------------------------------------------
     */
-
-    // SELLER PRODUCTS
-    Route::get('/products/my', [ProductController::class, 'myProducts']);
 
     // CREATE PRODUCT
     Route::post('/products', [ProductController::class, 'store'])
