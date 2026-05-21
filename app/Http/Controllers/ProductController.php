@@ -56,55 +56,49 @@ class ProductController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'category_id' => 'nullable|exists:categories,id',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'status' => 'boolean',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'category_id' => 'nullable|exists:categories,id',
+        'description' => 'nullable|string',
+        'price' => 'required|numeric|min:0',
+        'stock' => 'required|integer|min:0',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'status' => 'boolean',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $data = $request->only([
-            'name',
-            'category_id',
-            'description',
-            'price',
-            'stock',
-            'status'
-        ]);
-
-        $data['slug'] = Str::slug($request->name);
-        $data['seller_id'] = $request->user()->id;
-
-        // IMAGE UPLOAD FIX FOR RENDER
-        if ($request->hasFile('image')) {
-
-            $image = $request->file('image');
-
-            $filename = time() . '_' . $image->getClientOriginalName();
-
-            // SAVE DIRECTLY TO PUBLIC/PRODUCTS
-            $image->move(public_path('products'), $filename);
-
-            $data['image'] = 'products/' . $filename;
-        }
-
-        $product = Product::create($data);
-
+    if ($validator->fails()) {
         return response()->json([
-            'product' => $product->load(['seller', 'category']),
-            'message' => 'Product created successfully'
-        ], 201);
+            'errors' => $validator->errors()
+        ], 422);
     }
+
+    $data = $request->only([
+        'name',
+        'category_id',
+        'description',
+        'price',
+        'stock',
+        'status'
+    ]);
+
+    $data['seller_id'] = auth()->id();
+
+    // IMAGE UPLOAD
+    if ($request->hasFile('image')) {
+
+        $imagePath = $request->file('image')->store('products', 'public');
+
+        $data['image'] = $imagePath;
+    }
+
+    $product = Product::create($data);
+
+    return response()->json([
+        'message' => 'Product created successfully',
+        'data' => $product
+    ], 201);
+}
 
     public function show($id)
     {
