@@ -55,49 +55,71 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
-    public function store(Request $request)
+  public function store(Request $request)
 {
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'category_id' => 'nullable|exists:categories,id',
-        'description' => 'nullable|string',
-        'price' => 'required|numeric|min:0',
-        'stock' => 'required|integer|min:0',
-        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-        'status' => 'boolean',
-    ]);
+    try {
 
-    if ($validator->fails()) {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'category_id' => 'nullable|exists:categories,id',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0',
+            'stock' => 'required|integer|min:0',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'status' => 'boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $data = $request->only([
+            'name',
+            'category_id',
+            'description',
+            'price',
+            'stock',
+            'status'
+        ]);
+
+        $data['seller_id'] = auth()->id();
+
+        // FIX SLUG
+        $data['slug'] = Str::slug($data['name']);
+
+        // IMAGE UPLOAD
+        if ($request->hasFile('image')) {
+
+            $image = $request->file('image');
+
+            $filename = time() . '_' . $image->getClientOriginalName();
+
+            if (!file_exists(public_path('products'))) {
+                mkdir(public_path('products'), 0777, true);
+            }
+
+            $image->move(public_path('products'), $filename);
+
+            $data['image'] = 'products/' . $filename;
+        }
+
+        $product = Product::create($data);
+
         return response()->json([
-            'errors' => $validator->errors()
-        ], 422);
+            'message' => 'Product created successfully',
+            'data' => $product
+        ], 201);
+
+    } catch (\Exception $e) {
+
+        return response()->json([
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ], 500);
     }
-
-    $data = $request->only([
-        'name',
-        'category_id',
-        'description',
-        'price',
-        'stock',
-        'status'
-    ]);
-
-    $data['seller_id'] = auth()->id();
-
-    // IMAGE UPLOAD
-    if ($request->hasFile('image')) {
-
-        $imagePath = $request->file('image')->store('products', 'public');
-
-        $data['image'] = $imagePath;
-    }
-
-    $product = Product::create($data);
-
-    return response()->json([
-        'message' => 'Product created successfully',
-        'data' => $product
-    ], 201);
 }
 
     public function show($id)
