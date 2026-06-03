@@ -33,7 +33,9 @@ RUN php artisan config:clear && \
     php artisan route:clear
 
 # Permissions
-RUN chmod -R 775 storage bootstrap/cache
+RUN mkdir -p storage/framework/cache/data storage/framework/views storage/app/public && \
+    php artisan storage:link && \
+    chmod -R 775 storage bootstrap/cache
 
 # Expose port
 EXPOSE 10000
