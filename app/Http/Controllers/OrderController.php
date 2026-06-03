@@ -112,9 +112,25 @@ class OrderController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
+        $user = $request->user();
         $order = Order::with(['user', 'items.product'])->findOrFail($id);
+
+        if (!$user->isAdmin()) {
+            if ($user->isSeller()) {
+                $sellerProductIds = Product::where('seller_id', $user->id)->pluck('id');
+                $orderHasSellerProducts = OrderItem::where('order_id', $order->id)
+                    ->whereIn('product_id', $sellerProductIds)
+                    ->exists();
+                if (!$orderHasSellerProducts) {
+                    return response()->json(['message' => 'Forbidden'], 403);
+                }
+            } elseif ($order->user_id !== $user->id) {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+        }
+
         return response()->json($order);
     }
 
@@ -133,7 +149,22 @@ class OrderController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-        
+
+        $validTransitions = [
+            'pending'    => ['processing', 'cancelled'],
+            'processing' => ['shipped', 'cancelled'],
+            'shipped'    => ['delivered', 'cancelled'],
+            'delivered'  => ['completed', 'cancelled'],
+            'completed'  => [],
+            'cancelled'  => [],
+        ];
+
+        if (!in_array($request->status, $validTransitions[$order->status] ?? [])) {
+            return response()->json([
+                'message' => "Cannot transition from '{$order->status}' to '{$request->status}'"
+            ], 400);
+        }
+
         if ($user->role === 'customer') {
             return response()->json(['message' => 'Customers cannot update order status'], 403);
         }
