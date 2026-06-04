@@ -100,6 +100,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | CATEGORIES (Admin)
+    |--------------------------------------------------------------------------
+    */
+
+    // CREATE CATEGORY
+    Route::post('/categories', [CategoryController::class, 'store'])
+        ->middleware('role:system_admin,admin');
+
+    // UPDATE CATEGORY
+    Route::put('/categories/{id}', [CategoryController::class, 'update'])
+        ->middleware('role:system_admin,admin');
+
+    // DELETE CATEGORY
+    Route::delete('/categories/{id}', [CategoryController::class, 'destroy'])
+        ->middleware('role:system_admin,admin');
+
+    /*
+    |--------------------------------------------------------------------------
     | ORDERS
     |--------------------------------------------------------------------------
     */
