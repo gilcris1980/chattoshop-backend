@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -91,18 +92,8 @@ class ProductController extends Controller
 
         // IMAGE UPLOAD
         if ($request->hasFile('image')) {
-
-            $image = $request->file('image');
-
-            $filename = time() . '_' . $image->getClientOriginalName();
-
-            if (!file_exists(public_path('products'))) {
-                mkdir(public_path('products'), 0777, true);
-            }
-
-            $image->move(public_path('products'), $filename);
-
-            $data['image'] = 'products/' . $filename;
+            $path = $request->file('image')->store('products', 'public');
+            $data['image'] = $path;
         }
 
         $product = Product::create($data);
@@ -172,16 +163,14 @@ class ProductController extends Controller
             $data['slug'] = Str::slug($request->name);
         }
 
-        // IMAGE UPDATE FIX
+        // IMAGE UPDATE
         if ($request->hasFile('image')) {
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
 
-            $image = $request->file('image');
-
-            $filename = time() . '_' . $image->getClientOriginalName();
-
-            $image->move(public_path('products'), $filename);
-
-            $data['image'] = 'products/' . $filename;
+            $path = $request->file('image')->store('products', 'public');
+            $data['image'] = $path;
         }
 
         $product->update($data);
