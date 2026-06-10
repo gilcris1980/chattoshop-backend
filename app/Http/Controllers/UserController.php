@@ -9,7 +9,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
+
 
 class UserController extends Controller
 {
@@ -269,7 +269,7 @@ class UserController extends Controller
 
         // Delete avatar if exists
         if ($targetUser->avatar) {
-            Storage::disk('public')->delete($targetUser->avatar);
+            cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($targetUser->avatar));
         }
 
         // Delete user's tokens

@@ -6,8 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
+
 
 class ProductController extends Controller
 {
@@ -93,16 +92,11 @@ class ProductController extends Controller
 
         // IMAGE UPLOAD
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-            $data['image'] = $path;
-
-            $absolutePath = Storage::disk('public')->path($path);
-            Log::info('PRODUCT_UPLOAD_DEBUG', [
-                'stored_path' => $path,
-                'absolute_path' => $absolutePath,
-                'file_exists' => Storage::disk('public')->exists($path),
-                'public_root' => config('filesystems.disks.public.root'),
-            ]);
+            $uploadedFile = cloudinary()->uploadApi()->upload(
+                $request->file('image')->getRealPath(),
+                ['folder' => 'products']
+            );
+            $data['image'] = $uploadedFile['secure_url'];
         }
 
         $product = Product::create($data);
@@ -175,11 +169,14 @@ class ProductController extends Controller
         // IMAGE UPDATE
         if ($request->hasFile('image')) {
             if ($product->image) {
-                Storage::disk('public')->delete($product->image);
+                cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 
-            $path = $request->file('image')->store('products', 'public');
-            $data['image'] = $path;
+            $uploadedFile = cloudinary()->uploadApi()->upload(
+                $request->file('image')->getRealPath(),
+                ['folder' => 'products']
+            );
+            $data['image'] = $uploadedFile['secure_url'];
         }
 
         $product->update($data);
@@ -210,7 +207,7 @@ class ProductController extends Controller
         ) {
 
             if ($product->image) {
-                Storage::disk('public')->delete($product->image);
+                cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 
             $product->delete();
@@ -227,7 +224,7 @@ class ProductController extends Controller
         ) {
 
             if ($product->image) {
-                Storage::disk('public')->delete($product->image);
+                cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 
             $product->delete();

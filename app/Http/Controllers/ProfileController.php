@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ProfileController extends Controller
@@ -34,11 +33,14 @@ class ProfileController extends Controller
 
         if ($request->hasFile('avatar')) {
             if ($user->avatar) {
-                Storage::disk('public')->delete($user->avatar);
+                cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($user->avatar));
             }
 
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = $path;
+            $uploadedFile = cloudinary()->uploadApi()->upload(
+                $request->file('avatar')->getRealPath(),
+                ['folder' => 'avatars']
+            );
+            $user->avatar = $uploadedFile['secure_url'];
         }
 
         $user->save();
