@@ -32,15 +32,23 @@ class ProfileController extends Controller
         $user->address = $request->address;
 
         if ($request->hasFile('avatar')) {
-            if ($user->avatar && str_starts_with($user->avatar, 'https://res.cloudinary.com/')) {
-                cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($user->avatar));
-            }
+            try {
+                if ($user->avatar && str_starts_with($user->avatar, 'https://res.cloudinary.com/')) {
+                    cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($user->avatar));
+                }
 
-            $uploadedFile = cloudinary()->uploadApi()->upload(
-                $request->file('avatar')->getRealPath(),
-                ['folder' => 'avatars']
-            );
-            $user->avatar = $uploadedFile['secure_url'];
+                $uploadedFile = cloudinary()->uploadApi()->upload(
+                    $request->file('avatar')->getRealPath(),
+                    ['folder' => 'avatars']
+                );
+                $user->avatar = $uploadedFile['secure_url'];
+            } catch (\Exception $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                    'file' => $e->getFile()
+                ], 500);
+            }
         }
 
         $user->save();
