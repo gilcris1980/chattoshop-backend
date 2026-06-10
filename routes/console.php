@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-Artisan::command('cleanup:orphan-images', function () {
+Artisan::command('cleanup:orphan-images {--delete}', function () {
     $disk = Storage::disk('public');
     $productDir = 'products';
     $delete = $this->option('delete');
@@ -50,4 +50,4 @@ Artisan::command('cleanup:orphan-images', function () {
     }
 
     return 0;
-})->purpose('List and optionally delete product images not referenced in the database')->option('delete', null, null, 'Delete orphaned files');
+})->purpose('List and optionally delete product images not referenced in the database');
