@@ -69,4 +69,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class)->where('is_read', false);
     }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\PasswordResetNotification($token, $this->email));
+    }
 }

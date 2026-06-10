@@ -40,6 +40,10 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->user()->role !== 'customer') {
+            return response()->json(['message' => 'Only customers can place orders.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -246,6 +250,25 @@ class OrderController extends Controller
         );
 
         return response()->json(['message' => 'Order cancelled successfully']);
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $order = Order::findOrFail($id);
+
+            $order->items()->delete();
+            $order->delete();
+
+            return response()->json(['message' => 'Order deleted successfully']);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
+            ], 500);
+        }
     }
 
     private function createNotification($userId, $title, $message, $type)

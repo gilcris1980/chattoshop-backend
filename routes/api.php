@@ -32,6 +32,10 @@ Route::get('/', function () {
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
+// PASSWORD RESET
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC PRODUCTS & CATEGORIES
@@ -134,6 +138,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
     Route::get('/orders/stats', [OrderController::class, 'stats']);
+
+    // DELETE ORDER (Admin only)
+    Route::delete('/orders/{id}', [OrderController::class, 'destroy'])
+        ->middleware('role:system_admin,admin');
 
     /*
     |--------------------------------------------------------------------------
