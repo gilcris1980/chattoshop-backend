@@ -32,7 +32,7 @@ class ProfileController extends Controller
         $user->address = $request->address;
 
         if ($request->hasFile('avatar')) {
-            if ($user->avatar) {
+            if ($user->avatar && str_starts_with($user->avatar, 'https://res.cloudinary.com/')) {
                 cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($user->avatar));
             }
 

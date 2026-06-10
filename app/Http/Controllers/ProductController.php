@@ -168,7 +168,7 @@ class ProductController extends Controller
 
         // IMAGE UPDATE
         if ($request->hasFile('image')) {
-            if ($product->image) {
+            if ($product->image && str_starts_with($product->image, 'https://res.cloudinary.com/')) {
                 cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 
@@ -206,7 +206,7 @@ class ProductController extends Controller
             $user->role === 'admin'
         ) {
 
-            if ($product->image) {
+            if ($product->image && str_starts_with($product->image, 'https://res.cloudinary.com/')) {
                 cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 
@@ -223,7 +223,7 @@ class ProductController extends Controller
             $product->seller_id == $user->id
         ) {
 
-            if ($product->image) {
+            if ($product->image && str_starts_with($product->image, 'https://res.cloudinary.com/')) {
                 cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($product->image));
             }
 

@@ -268,7 +268,7 @@ class UserController extends Controller
         }
 
         // Delete avatar if exists
-        if ($targetUser->avatar) {
+        if ($targetUser->avatar && str_starts_with($targetUser->avatar, 'https://res.cloudinary.com/')) {
             cloudinary()->uploadApi()->destroy($this->extractCloudinaryPublicId($targetUser->avatar));
         }
 
