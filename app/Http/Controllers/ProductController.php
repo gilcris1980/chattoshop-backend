@@ -209,6 +209,10 @@ class ProductController extends Controller
             $user->role === 'admin'
         ) {
 
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
+
             $product->delete();
 
             return response()->json([
@@ -221,6 +225,10 @@ class ProductController extends Controller
             $user->role === 'seller' &&
             $product->seller_id == $user->id
         ) {
+
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
 
             $product->delete();
 
