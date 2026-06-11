@@ -6,6 +6,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class CategoryController extends Controller
 {
@@ -100,7 +101,14 @@ class CategoryController extends Controller
 
             return response()->json(['message' => 'Category deleted successfully']);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('Category delete failed: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'category_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'error' => $e->getMessage(),
                 'line' => $e->getLine(),
