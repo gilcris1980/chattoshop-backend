@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
+            'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
@@ -42,6 +43,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException $e, $request) {
             if ($request->is('api/*')) {
                 return response()->json(['message' => 'Method not allowed'], 405);
+            }
+        });
+
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, $request) {
+            if ($e->getStatusCode() === 403 && $e->getMessage() === 'Your email address is not verified.' && $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Email not verified',
+                    'error' => 'Please verify your email before accessing this resource.'
+                ], 403);
             }
         });
 

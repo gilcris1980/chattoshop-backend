@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\Verified;
 
 class AuthController extends Controller
 {
@@ -32,12 +33,14 @@ class AuthController extends Controller
             'role' => $request->role ?? 'customer',
         ]);
 
+        $user->sendEmailVerificationNotification();
+
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
             'user' => $user,
             'token' => $token,
-            'message' => 'Registration successful'
+            'message' => 'Registration successful. Please verify your email.'
         ], 201);
     }
 
@@ -200,5 +203,55 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => __($status)], 400);
+    }
+
+    // =========================
+    // EMAIL VERIFICATION
+    // =========================
+
+    public function verifyEmail(Request $request, $id, $hash)
+    {
+        $user = User::findOrFail($id);
+
+        if (!hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Invalid verification link'], 400);
+            }
+            return redirect(env('FRONTEND_URL', 'http://127.0.0.1:5500') . '/verify-email.html?error=invalid');
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Email already verified']);
+            }
+            return redirect(env('FRONTEND_URL', 'http://127.0.0.1:5500') . '/verify-email.html?verified=1');
+        }
+
+        $user->markEmailAsVerified();
+
+        event(new Verified($user));
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Email verified successfully']);
+        }
+
+        return redirect(env('FRONTEND_URL', 'http://127.0.0.1:5500') . '/verify-email.html?verified=1');
+    }
+
+    public function resendVerificationEmail(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json(['message' => 'Email already verified']);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json(['message' => 'Verification email resent']);
     }
 }
