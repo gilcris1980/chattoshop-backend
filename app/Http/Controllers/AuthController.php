@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Verified;
 
@@ -18,7 +18,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
             'role' => 'sometimes|in:customer,seller',
         ]);
 
@@ -73,11 +73,14 @@ class AuthController extends Controller
                 'message' => 'Login successful'
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
 
             return response()->json([
                 'message' => 'Login failed',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'type' => get_class($e)
             ], 500);
         }
     }
@@ -180,7 +183,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
             'token' => 'required|string',
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
         if ($validator->fails()) {
