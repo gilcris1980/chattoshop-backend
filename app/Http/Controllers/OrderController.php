@@ -41,7 +41,10 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         if ($request->user()->role !== 'customer') {
-            return response()->json(['message' => 'Only customers can place orders.'], 403);
+            $msg = $request->user()->isSeller()
+                ? 'Sellers cannot purchase products. Please use a customer account.'
+                : 'Only customers can place orders.';
+            return response()->json(['message' => $msg], 403);
         }
 
         $validator = Validator::make($request->all(), [

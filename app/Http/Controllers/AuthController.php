@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -23,17 +24,31 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            $errors = $validator->errors();
+            if ($errors->has('email')) {
+                return response()->json([
+                    'message' => 'Email already exists. Please use another email address or sign in.',
+                    'errors' => $errors,
+                ], 422);
+            }
+            return response()->json(['errors' => $errors], 422);
         }
+
+        $role = $request->role ?? 'customer';
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role ?? 'customer',
+            'role' => $role,
+            'seller_status' => $role === 'seller' ? 'pending' : null,
         ]);
 
-        $user->sendEmailVerificationNotification();
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (\Throwable $e) {
+            Log::error('Verification email failed to send: ' . $e->getMessage());
+        }
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -53,9 +68,9 @@ class AuthController extends Controller
                 'password' => 'required',
             ]);
 
-            if ($validator->fails()) {
+        if ($validator->fails()) {
                 return response()->json(['errors' => $validator->errors()], 422);
-            }
+        }
 
             $user = User::where('email', $request->email)->first();
 
@@ -163,15 +178,20 @@ class AuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        try {
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return response()->json(['message' => 'Password reset link sent to your email']);
+            if ($status === Password::RESET_LINK_SENT) {
+                return response()->json(['message' => 'Password reset email sent successfully.']);
+            }
+
+            return response()->json(['message' => 'Unable to send reset link'], 500);
+        } catch (\Throwable $e) {
+            Log::error('Password reset email failed to send: ' . $e->getMessage());
+            return response()->json(['message' => 'Password reset email failed to send.'], 500);
         }
-
-        return response()->json(['message' => 'Unable to send reset link'], 500);
     }
 
     // =========================
@@ -253,8 +273,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Email already verified']);
         }
 
-        $user->sendEmailVerificationNotification();
-
-        return response()->json(['message' => 'Verification email resent']);
+        try {
+            $user->sendEmailVerificationNotification();
+            return response()->json(['message' => 'Verification email sent successfully.']);
+        } catch (\Throwable $e) {
+            Log::error('Resend verification email failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Verification email failed to send.'], 500);
+        }
     }
 }

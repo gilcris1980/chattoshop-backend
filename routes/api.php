@@ -42,6 +42,18 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/email/verification-notification', [AuthController::class, 'resendVerificationEmail']);
+
+    Route::get('/me', [AuthController::class, 'me']);
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/debug-auth', function () {
+        return [
+            'id' => auth()->id(),
+            'email' => auth()->user()?->email,
+            'email_verified_at' => auth()->user()?->email_verified_at,
+        ];
+    });
 });
 
 /*
@@ -77,10 +89,6 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     | AUTH USER
     |--------------------------------------------------------------------------
     */
-
-    Route::get('/me', [AuthController::class, 'me']);
-
-    Route::post('/logout', [AuthController::class, 'logout']);
 
     /*
     |--------------------------------------------------------------------------
@@ -190,6 +198,16 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             Route::put('/users/{id}/role', [UserController::class, 'updateRole']);
 
             Route::get('/users/stats', [UserController::class, 'stats']);
+
+            Route::put('/users/{id}/approve-seller', [UserController::class, 'approveSeller']);
+
+            Route::put('/users/{id}/reject-seller', [UserController::class, 'rejectSeller']);
+
+            Route::get('/products', [ProductController::class, 'adminProducts']);
+
+            Route::put('/products/{id}/approve', [ProductController::class, 'approveProduct']);
+
+            Route::put('/products/{id}/reject', [ProductController::class, 'rejectProduct']);
 
             Route::get('/orders/stats/all', [OrderController::class, 'allStats']);
         });

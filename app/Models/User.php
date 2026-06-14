@@ -14,7 +14,7 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasFactory, HasApiTokens, Notifiable, \Illuminate\Auth\MustVerifyEmail;
 
     protected $fillable = [
-        'name', 'email', 'password', 'role', 'phone', 'address', 'avatar'
+        'name', 'email', 'password', 'role', 'phone', 'address', 'avatar', 'seller_status'
     ];
 
     protected $hidden = [
@@ -49,6 +49,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isCustomer(): bool
     {
         return $this->role === 'customer';
+    }
+
+    public function isSellerApproved(): bool
+    {
+        return $this->role === 'seller' && $this->seller_status === 'approved';
+    }
+
+    public function isSellerPending(): bool
+    {
+        return $this->role === 'seller' && $this->seller_status === 'pending';
+    }
+
+    public function isSellerRejected(): bool
+    {
+        return $this->role === 'seller' && $this->seller_status === 'rejected';
     }
 
     public function products(): HasMany

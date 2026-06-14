@@ -60,6 +60,8 @@ class UserController extends Controller
                 'completed' => Order::where('status', 'completed')->count(),
                 'cancelled' => Order::where('status', 'cancelled')->count(),
             ],
+            'pending_sellers' => User::where('role', 'seller')->where('seller_status', 'pending')->count(),
+            'pending_products' => Product::where('product_status', 'pending')->count(),
             'user_stats' => [
                 'customers' => User::where('role', 'customer')->count(),
                 'sellers' => User::where('role', 'seller')->count(),
@@ -91,7 +93,11 @@ class UserController extends Controller
             $query->where('role', $request->role);
         }
 
-        $users = $query->select('id', 'name', 'email', 'role', 'phone', 'address', 'avatar', 'created_at', 'updated_at')
+        if ($request->seller_status) {
+            $query->where('seller_status', $request->seller_status);
+        }
+
+        $users = $query->select('id', 'name', 'email', 'role', 'seller_status', 'phone', 'address', 'avatar', 'created_at', 'updated_at')
                        ->orderBy('created_at', 'desc')
                        ->paginate($request->per_page ?? 15);
 
@@ -130,6 +136,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
+            'seller_status' => $request->role === 'seller' ? 'pending' : null,
             'phone' => $request->phone,
             'address' => $request->address,
         ]);
@@ -191,6 +198,11 @@ class UserController extends Controller
         // Only system_admin can change roles
         if ($request->has('role') && $currentUser->isSystemAdmin()) {
             $data['role'] = $request->role;
+            if ($request->role === 'seller') {
+                $data['seller_status'] = 'pending';
+            } elseif ($request->role !== 'seller') {
+                $data['seller_status'] = null;
+            }
         }
         
         if ($request->password) {
@@ -229,7 +241,15 @@ class UserController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $targetUser->update(['role' => $request->role]);
+        $data = ['role' => $request->role];
+
+        if ($request->role === 'seller') {
+            $data['seller_status'] = 'pending';
+        } elseif ($request->role !== 'seller') {
+            $data['seller_status'] = null;
+        }
+
+        $targetUser->update($data);
 
         return response()->json([
             'user' => $targetUser->fresh(),
@@ -279,6 +299,50 @@ class UserController extends Controller
         $targetUser->delete();
 
         return response()->json(['message' => 'User deleted successfully']);
+    }
+
+    public function approveSeller(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $targetUser = User::findOrFail($id);
+
+        if (!$targetUser->isSeller()) {
+            return response()->json(['message' => 'User is not a seller'], 400);
+        }
+
+        $targetUser->update(['seller_status' => 'approved']);
+
+        return response()->json([
+            'user' => $targetUser->fresh(),
+            'message' => 'Seller approved successfully'
+        ]);
+    }
+
+    public function rejectSeller(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user->isAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $targetUser = User::findOrFail($id);
+
+        if (!$targetUser->isSeller()) {
+            return response()->json(['message' => 'User is not a seller'], 400);
+        }
+
+        $targetUser->update(['seller_status' => 'rejected']);
+
+        return response()->json([
+            'user' => $targetUser->fresh(),
+            'message' => 'Seller rejected successfully'
+        ]);
     }
 
     public function stats()
