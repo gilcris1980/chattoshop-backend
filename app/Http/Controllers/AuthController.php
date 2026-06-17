@@ -32,9 +32,30 @@ class AuthController extends Controller
         ]);
 
         try {
+            Log::info('Sending OTP email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'type' => $type,
+            ]);
+
             $user->notify(new SendOtpNotification($otp, $type));
+
+            Log::info('OTP email sent successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'type' => $type,
+            ]);
         } catch (\Throwable $e) {
-            Log::error($type . ' OTP email failed: ' . $e->getMessage());
+            Log::error('OTP send failed', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'type' => $type,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
 
         return $otp;
