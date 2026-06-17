@@ -155,6 +155,8 @@ class AuthController extends Controller
 
     public function resendOtp(Request $request)
     {
+        Log::info('RESEND OTP ENDPOINT HIT');
+
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
         ]);
