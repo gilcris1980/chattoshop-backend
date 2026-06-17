@@ -57,6 +57,38 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    public function adminProducts(Request $request)
+    {
+        $query = Product::with(['seller', 'category']);
+
+        if ($request->search) {
+            $query->where('name', 'like', "%{$request->search}%");
+        }
+
+        if ($request->product_status) {
+            $query->where('product_status', $request->product_status);
+        }
+
+        if ($request->seller_id) {
+            $query->where('seller_id', $request->seller_id);
+        }
+
+        if ($request->category) {
+            $query->where('category_id', $request->category);
+        }
+
+        $sortBy = $request->sort ?? 'created_at';
+        $sortDir = $request->order ?? 'desc';
+
+        if (in_array($sortBy, ['price', 'created_at', 'name', 'product_status'])) {
+            $query->orderBy($sortBy, $sortDir === 'asc' ? 'asc' : 'desc');
+        }
+
+        $products = $query->paginate($request->per_page ?? 15);
+
+        return response()->json($products);
+    }
+
   public function store(Request $request)
 {
     try {
@@ -87,6 +119,7 @@ class ProductController extends Controller
         ]);
 
         $data['seller_id'] = auth()->id();
+        $data['product_status'] = 'pending';
 
         // FIX SLUG
         $data['slug'] = Str::slug($data['name']);
@@ -240,5 +273,27 @@ class ProductController extends Controller
         return response()->json([
             'message' => 'Unauthorized'
         ], 403);    
+    }
+
+    public function approveProduct($id)
+    {
+        $product = Product::findOrFail($id);
+        $product->update(['product_status' => 'approved']);
+
+        return response()->json([
+            'message' => 'Product approved successfully',
+            'product' => $product->fresh()->load(['seller', 'category']),
+        ]);
+    }
+
+    public function rejectProduct($id)
+    {
+        $product = Product::findOrFail($id);
+        $product->update(['product_status' => 'rejected']);
+
+        return response()->json([
+            'message' => 'Product rejected successfully',
+            'product' => $product->fresh()->load(['seller', 'category']),
+        ]);
     }
 }
