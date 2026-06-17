@@ -64,7 +64,13 @@ class OrderController extends Controller
 
         foreach ($request->items as $item) {
             $product = Product::findOrFail($item['product_id']);
-            
+
+            if ($product->product_status !== 'approved' || !$product->status) {
+                return response()->json([
+                    'message' => "Product '{$product->name}' is not available for purchase"
+                ], 400);
+            }
+
             if ($product->stock < $item['quantity']) {
                 return response()->json([
                     'message' => "Insufficient stock for product: {$product->name}"

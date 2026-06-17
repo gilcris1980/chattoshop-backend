@@ -13,7 +13,9 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with(['seller', 'category']);
+        $query = Product::with(['seller', 'category'])
+            ->where('status', true)
+            ->where('product_status', 'approved');
 
         if ($request->category) {
             $query->where('category_id', $request->category);
@@ -29,10 +31,6 @@ class ProductController extends Controller
 
         if ($request->min_price && $request->max_price) {
             $query->whereBetween('price', [$request->min_price, $request->max_price]);
-        }
-
-        if ($request->status !== null) {
-            $query->where('status', $request->status);
         }
 
         $sortBy = $request->sort ?? 'created_at';
@@ -159,6 +157,17 @@ class ProductController extends Controller
     {
         $product = Product::with(['seller', 'category'])
             ->findOrFail($id);
+
+        $user = auth()->user();
+
+        if (
+            $product->product_status !== 'approved' ||
+            !$product->status
+        ) {
+            if (!$user || ($user->id !== $product->seller_id && !$user->isAdmin())) {
+                return response()->json(['message' => 'Product not found'], 404);
+            }
+        }
 
         return response()->json($product);
     }

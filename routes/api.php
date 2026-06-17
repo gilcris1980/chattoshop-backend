@@ -187,6 +187,8 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
             Route::get('/users', [UserController::class, 'adminIndex']);
 
+            Route::get('/users/stats', [UserController::class, 'stats']);
+
             Route::post('/users', [UserController::class, 'store']);
 
             Route::get('/users/{id}', [UserController::class, 'show']);
@@ -196,8 +198,6 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
             Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
             Route::put('/users/{id}/role', [UserController::class, 'updateRole']);
-
-            Route::get('/users/stats', [UserController::class, 'stats']);
 
             Route::put('/users/{id}/approve-seller', [UserController::class, 'approveSeller']);
 
