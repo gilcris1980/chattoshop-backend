@@ -32,16 +32,23 @@ Route::get('/', function () {
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
-// PASSWORD RESET
-Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+// EMAIL VERIFICATION OTP
+Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+Route::post('/resend-verification-otp', [AuthController::class, 'resendOtp'])
+    ->middleware('throttle:2,1');
 
-// EMAIL VERIFICATION
-Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+// PASSWORD RESET OTP
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])
+    ->middleware('throttle:3,60');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:5,60');
+
+// LEGACY SIGNED URL VERIFICATION (backward compat)
+Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmailLegacy'])
     ->name('verification.verify');
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/email/verification-notification', [AuthController::class, 'resendVerificationEmail']);
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
 
     Route::get('/me', [AuthController::class, 'me']);
 

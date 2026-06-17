@@ -47,10 +47,10 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, $request) {
-            if ($e->getStatusCode() === 403 && $e->getMessage() === 'Your email address is not verified.' && $request->expectsJson()) {
+            if ($e->getStatusCode() === 403 && $e->getMessage() === 'Your email address is not verified.' && ($request->expectsJson() || $request->is('api/*'))) {
                 return response()->json([
-                    'message' => 'Email not verified',
-                    'error' => 'Please verify your email before accessing this resource.'
+                    'message' => 'Please verify your email first.',
+                    'needs_verification' => true,
                 ], 403);
             }
         });

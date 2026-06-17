@@ -86,6 +86,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Notification::class)->where('is_read', false);
     }
 
+    public function otps(): HasMany
+    {
+        return $this->hasMany(Otp::class);
+    }
+
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new \App\Notifications\PasswordResetNotification($token, $this->email));

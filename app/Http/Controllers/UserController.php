@@ -6,9 +6,12 @@ use App\Models\User;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\Category;
+use App\Models\Otp;
+use App\Notifications\SendOtpNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 
 class UserController extends Controller
@@ -207,6 +210,27 @@ class UserController extends Controller
         
         if ($request->password) {
             $data['password'] = Hash::make($request->password);
+        }
+
+        if ($request->has('email') && $request->email !== $targetUser->getOriginal('email')) {
+            $data['email_verified_at'] = null;
+
+            try {
+                $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+                Otp::where('user_id', $targetUser->id)->where('type', 'email_verification')->delete();
+
+                Otp::create([
+                    'user_id' => $targetUser->id,
+                    'type' => 'email_verification',
+                    'otp' => Hash::make($otp),
+                    'expires_at' => now()->addMinutes(10),
+                ]);
+
+                $targetUser->notify(new SendOtpNotification($otp, 'email_verification'));
+            } catch (\Throwable $e) {
+                Log::error('Admin email change OTP failed: ' . $e->getMessage());
+            }
         }
 
         $targetUser->update($data);
