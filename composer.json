@@ -9,7 +9,8 @@
         "cloudinary-labs/cloudinary-laravel": "*",
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^2.9"
+        "laravel/tinker": "^2.9",
+        "resend/resend-laravel": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
