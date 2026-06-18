@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Mail;
 
 Route::get('/', function () {
     return response()->json([
@@ -18,4 +19,30 @@ Route::get('/mail-test', function () {
         'from' => config('mail.from.address'),
         'from_name' => config('mail.from.name'),
     ];
+});
+
+Route::get('/smtp-test', function () {
+    try {
+        $connection = fsockopen('smtp.gmail.com', 465, $errno, $errstr, 15);
+
+        if (!$connection) {
+            return [
+                'success' => false,
+                'errno' => $errno,
+                'error' => $errstr,
+            ];
+        }
+
+        fclose($connection);
+
+        return [
+            'success' => true,
+            'message' => 'SMTP reachable'
+        ];
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'error' => $e->getMessage()
+        ];
+    }
 });
