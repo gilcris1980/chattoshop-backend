@@ -27,6 +27,8 @@ return [
         '127.0.0.1:5500',
         '127.0.0.1:8000',
         '::1',
+        'chattoshop.online',
+        '.chattoshop.online',
     ]),
 
     /*
