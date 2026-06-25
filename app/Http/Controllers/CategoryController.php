@@ -22,7 +22,7 @@ class CategoryController extends Controller
             $query->where('name', 'like', "%{$request->search}%");
         }
 
-        $categories = $query->orderBy('name')->get();
+        $categories = $query->withCount('products')->orderBy('name')->get();
 
         return response()->json($categories);
     }
