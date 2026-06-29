@@ -7,6 +7,7 @@ use App\Models\Otp;
 use App\Notifications\SendOtpNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Support\Facades\Log;
@@ -255,23 +256,22 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
         if ($validator->fails()) {
-            if ($validator->errors()->has('email')) {
-                return response()->json(['message' => 'Email not found'], 404);
-            }
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $user = User::where('email', $request->email)->first();
 
-        $this->sendOtp($user, 'password_reset', 15);
+        if ($user) {
+            $token = Password::broker()->createToken($user);
+            $user->sendPasswordResetNotification($token);
+        }
 
         return response()->json([
-            'message' => 'Password reset code sent to your email.',
-            'email' => $user->email,
+            'message' => 'If that email address is registered, you will receive a password reset link shortly.'
         ]);
     }
 
@@ -282,8 +282,8 @@ class AuthController extends Controller
     public function resetPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-            'otp' => 'required|string|size:6',
+            'token' => 'required|string',
+            'email' => 'required|email',
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
@@ -291,18 +291,19 @@ class AuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $status = Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->password = Hash::make($password);
+                $user->save();
+            }
+        );
 
-        if (!$this->verifyOtp($user, 'password_reset', $request->otp)) {
-            return response()->json(['message' => 'Invalid or expired reset code'], 400);
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json(['message' => 'Password reset successfully']);
         }
 
-        $user->password = Hash::make($request->password);
-        $user->save();
-
-        Otp::where('user_id', $user->id)->where('type', 'password_reset')->delete();
-
-        return response()->json(['message' => 'Password reset successfully']);
+        return response()->json(['message' => 'Invalid or expired reset token'], 400);
     }
 
     // =========================
