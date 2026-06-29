@@ -85,9 +85,17 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
+    private function authorizeSellerNotPending($user): void
+    {
+        if ($user->role === 'seller' && $user->seller_status === 'pending') {
+            abort(403, 'Your account is pending administrator approval.');
+        }
+    }
+
   public function store(Request $request)
 {
     try {
+        $this->authorizeSellerNotPending($request->user());
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -136,6 +144,8 @@ class ProductController extends Controller
             'data' => $product
         ], 201);
 
+    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        throw $e;
     } catch (\Exception $e) {
 
         return response()->json([
@@ -167,6 +177,8 @@ class ProductController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorizeSellerNotPending($request->user());
+
         $product = Product::findOrFail($id);
 
         if (
@@ -230,6 +242,9 @@ class ProductController extends Controller
 
     public function destroy($id)
     {
+        $user = auth()->user();
+        $this->authorizeSellerNotPending($user);
+
         $product = Product::find($id);
 
         if (!$product) {
@@ -238,8 +253,6 @@ class ProductController extends Controller
                 'message' => 'Product not found'
             ], 404);
         }
-
-        $user = auth()->user();
 
         $imageDeleted = false;
 

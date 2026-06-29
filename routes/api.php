@@ -48,8 +48,6 @@ Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmailLega
     ->name('verification.verify');
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/change-password', [AuthController::class, 'changePassword']);
-
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -96,6 +94,8 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     | AUTH USER
     |--------------------------------------------------------------------------
     */
+
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
 
     /*
     |--------------------------------------------------------------------------

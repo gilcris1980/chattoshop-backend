@@ -29,7 +29,7 @@ class OrderController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
         } else {
-            $orders = Order::with(['items.product'])
+            $orders = Order::with(['user', 'items.product'])
                 ->where('user_id', $user->id)
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
@@ -73,8 +73,8 @@ class OrderController extends Controller
 
             if ($product->stock < $item['quantity']) {
                 return response()->json([
-                    'message' => "Insufficient stock for product: {$product->name}"
-                ], 400);
+                    'message' => 'Insufficient stock available.'
+                ], 422);
             }
 
             // Check if user is buying their own product
@@ -120,7 +120,7 @@ class OrderController extends Controller
         }
 
         return response()->json([
-            'order' => $order->load(['items.product']),
+            'order' => $order->load(['user', 'items.product']),
             'message' => 'Order created successfully'
         ], 201);
     }
@@ -128,7 +128,7 @@ class OrderController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $order = Order::with(['user', 'items.product'])->findOrFail($id);
+        $order = Order::with(['user', 'items.product.seller'])->findOrFail($id);
 
         if (!$user->isAdmin()) {
             if ($user->isSeller()) {
@@ -150,6 +150,13 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = $request->user();
+
+        if ($user->role === 'seller' && $user->seller_status === 'pending') {
+            return response()->json([
+                'message' => 'Your account is pending administrator approval.'
+            ], 403);
+        }
+
         $order = Order::findOrFail($id);
         
         // Order status flow: pending → processing → shipped → delivered → completed
