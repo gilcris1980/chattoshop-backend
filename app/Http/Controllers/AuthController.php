@@ -201,8 +201,10 @@ class AuthController extends Controller
             }
 
             if (!$user->hasVerifiedEmail()) {
+                $this->sendOtp($user, 'email_verification', 10);
+
                 return response()->json([
-                    'message' => 'Email not verified. Please verify your email first.',
+                    'message' => 'Please verify your email.',
                     'needs_verification' => true,
                     'email' => $user->email,
                 ], 403);
