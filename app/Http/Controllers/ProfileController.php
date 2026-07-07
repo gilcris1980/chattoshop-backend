@@ -37,6 +37,8 @@ class ProfileController extends Controller
         $user->phone = $request->phone;
         $user->address = $request->address;
 
+        $emailChanged = false;
+
         if ($request->has('email') && $request->email !== $user->getOriginal('email')) {
             if (!Hash::check($request->current_password, $user->password)) {
                 return response()->json(['message' => 'Current password is incorrect'], 400);
@@ -44,23 +46,7 @@ class ProfileController extends Controller
 
             $user->email = $request->email;
             $user->email_verified_at = null;
-
-            try {
-                $otp = $this->generateOtp();
-
-                Otp::where('user_id', $user->id)->where('type', 'email_verification')->delete();
-
-                Otp::create([
-                    'user_id' => $user->id,
-                    'type' => 'email_verification',
-                    'otp' => Hash::make($otp),
-                    'expires_at' => now()->addMinutes(10),
-                ]);
-
-                $user->notify(new SendOtpNotification($otp, 'email_verification'));
-            } catch (\Throwable $e) {
-                Log::error('Email change OTP failed: ' . $e->getMessage());
-            }
+            $emailChanged = true;
         }
 
         if ($request->hasFile('avatar')) {
@@ -85,14 +71,25 @@ class ProfileController extends Controller
 
         $user->save();
 
+        if ($emailChanged) {
+            try {
+                app(\App\Http\Controllers\AuthController::class)->sendOtp($user, 'email_verification', 10);
+            } catch (\Throwable $e) {
+                Log::error('Email change OTP failed: ' . $e->getMessage());
+            }
+
+            $user->currentAccessToken()->delete();
+
+            return response()->json([
+                'message' => 'Email changed successfully. Please verify your new email.',
+                'needs_verification' => true,
+                'email' => $user->email,
+            ]);
+        }
+
         return response()->json([
             'message' => 'Profile updated successfully',
             'user' => $user->fresh(),
         ]);
-    }
-
-    private function generateOtp(): string
-    {
-        return str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 }

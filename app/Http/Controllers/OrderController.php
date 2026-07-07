@@ -63,6 +63,10 @@ class OrderController extends Controller
         $orderItems = [];
 
         foreach ($request->items as $item) {
+            if ($item['quantity'] <= 0) {
+                return response()->json(['message' => 'Invalid product quantity.'], 422);
+            }
+
             $product = Product::findOrFail($item['product_id']);
 
             if ($product->product_status !== 'approved' || !$product->status) {

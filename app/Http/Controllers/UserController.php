@@ -216,18 +216,7 @@ class UserController extends Controller
             $data['email_verified_at'] = null;
 
             try {
-                $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-                Otp::where('user_id', $targetUser->id)->where('type', 'email_verification')->delete();
-
-                Otp::create([
-                    'user_id' => $targetUser->id,
-                    'type' => 'email_verification',
-                    'otp' => Hash::make($otp),
-                    'expires_at' => now()->addMinutes(10),
-                ]);
-
-                $targetUser->notify(new SendOtpNotification($otp, 'email_verification'));
+                app(\App\Http\Controllers\AuthController::class)->sendOtp($targetUser, 'email_verification', 10);
             } catch (\Throwable $e) {
                 Log::error('Admin email change OTP failed: ' . $e->getMessage());
             }

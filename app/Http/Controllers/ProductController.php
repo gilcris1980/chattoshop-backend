@@ -161,7 +161,7 @@ class ProductController extends Controller
         $product = Product::with(['seller', 'category'])
             ->findOrFail($id);
 
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
 
         if (
             $product->product_status !== 'approved' ||

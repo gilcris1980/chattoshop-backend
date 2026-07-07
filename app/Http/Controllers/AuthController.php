@@ -19,7 +19,7 @@ class AuthController extends Controller
         return str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
-    private function sendOtp(User $user, string $type, int $expiryMinutes = 10): string
+    public function sendOtp(User $user, string $type, int $expiryMinutes = 10): string
     {
         $otp = $this->generateOtp();
 
