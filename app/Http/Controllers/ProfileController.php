@@ -2,11 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Otp;
-use App\Notifications\SendOtpNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
@@ -21,7 +18,6 @@ class ProfileController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -34,14 +30,6 @@ class ProfileController extends Controller
         $user->name = $request->name;
         $user->phone = $request->phone;
         $user->address = $request->address;
-
-        $emailChanged = false;
-
-        if ($request->has('email') && $request->email !== $user->getOriginal('email')) {
-            $user->email = $request->email;
-            $user->email_verified_at = null;
-            $emailChanged = true;
-        }
 
         if ($request->hasFile('avatar')) {
             try {
@@ -64,22 +52,6 @@ class ProfileController extends Controller
         }
 
         $user->save();
-
-        if ($emailChanged) {
-            try {
-                app(\App\Http\Controllers\AuthController::class)->sendOtp($user, 'email_verification', 10);
-            } catch (\Throwable $e) {
-                Log::error('Email change OTP failed: ' . $e->getMessage());
-            }
-
-            $user->currentAccessToken()->delete();
-
-            return response()->json([
-                'message' => 'Email changed successfully. Please verify your new email.',
-                'needs_verification' => true,
-                'email' => $user->email,
-            ]);
-        }
 
         return response()->json([
             'message' => 'Profile updated successfully',
