@@ -139,8 +139,21 @@ class AuthController extends Controller
             return response()->json(['message' => 'Email already verified']);
         }
 
-        if (!$this->verifyOtp($user, 'email_verification', $request->otp)) {
-            return response()->json(['message' => 'Invalid or expired verification code'], 400);
+        $record = Otp::where('user_id', $user->id)
+            ->where('type', 'email_verification')
+            ->latest()
+            ->first();
+
+        if (!$record) {
+            return response()->json(['message' => 'No verification code found. Please request a new one.'], 400);
+        }
+
+        if (!$record->isValid()) {
+            return response()->json(['message' => 'OTP has expired. Please request a new verification code.'], 400);
+        }
+
+        if (!Hash::check($request->otp, $record->otp)) {
+            return response()->json(['message' => 'Incorrect OTP. Please try again.'], 400);
         }
 
         $user->markEmailAsVerified();
