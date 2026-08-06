@@ -17,6 +17,12 @@ Your email verification code is: <strong>{{ $otp }}</strong>
 This code will expire in 10 minutes.
 
 If you did not create an account, no further action is required.
+
+@if($verifyUrl)
+<x-mail::button :url="$verifyUrl">
+Open Verification Page
+</x-mail::button>
+@endif
 @endif
 
 @lang('Regards'),<br>

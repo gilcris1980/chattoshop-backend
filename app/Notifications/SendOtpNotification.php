@@ -36,6 +36,9 @@ class SendOtpNotification extends Notification
                 'otp' => $this->otp,
                 'type' => $this->type,
                 'name' => $notifiable->name,
+                'verifyUrl' => $this->type === 'email_verification'
+                    ? env('FRONTEND_URL', 'http://127.0.0.1:5500') . '/verify-email.html?email=' . urlencode($notifiable->email)
+                    : null,
             ]);
     }
 }
