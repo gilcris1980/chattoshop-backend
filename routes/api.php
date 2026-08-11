@@ -39,7 +39,7 @@ Route::post('/resend-verification-otp', [AuthController::class, 'resendOtp'])
 
 // PASSWORD RESET OTP
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])
-    ->middleware('throttle:3,60');
+    ->middleware('throttle:3,0.5');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,60');
 
