@@ -46,6 +46,17 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException $e, $request) {
+            if ($request->is('api/*')) {
+                $headers = $e->getHeaders();
+
+                return response()->json([
+                    'message' => 'Too many requests. Please wait before trying again.',
+                    'retry_after' => isset($headers['Retry-After']) ? (int) $headers['Retry-After'] : null,
+                ], 429);
+            }
+        });
+
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, $request) {
             if ($e->getStatusCode() === 403 && $e->getMessage() === 'Your email address is not verified.' && ($request->expectsJson() || $request->is('api/*'))) {
                 return response()->json([
@@ -53,14 +64,24 @@ return Application::configure(basePath: dirname(__DIR__))
                     'needs_verification' => true,
                 ], 403);
             }
+
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Request could not be processed.'], $e->getStatusCode());
+            }
         });
 
         $exceptions->render(function (\Throwable $e, $request) {
-            if ($request->is('api/*') && config('app.debug')) {
+            if ($request->is('api/*')) {
+                if (config('app.debug') && ! app()->isProduction()) {
+                    return response()->json([
+                        'message' => $e->getMessage(),
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ], 500);
+                }
+
                 return response()->json([
-                    'message' => 'Server error',
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'message' => 'Something went wrong while processing your request. Please try again later.',
                 ], 500);
             }
         });

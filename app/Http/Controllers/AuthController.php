@@ -233,9 +233,15 @@ class AuthController extends Controller
             ]);
 
         } catch (\Throwable $e) {
+            Log::error('Login failed', [
+                'email' => $request->email,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
-                'message' => 'Login failed',
-                'error' => $e->getMessage(),
+                'message' => 'Something went wrong while processing your request. Please try again later.',
             ], 500);
         }
     }
@@ -279,12 +285,24 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if ($user) {
-            $token = Password::broker()->createToken($user);
-            $user->sendPasswordResetNotification($token);
+            try {
+                $token = Password::broker()->createToken($user);
+                $user->sendPasswordResetNotification($token);
+            } catch (\Throwable $e) {
+                Log::error('Password reset email failed', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
         }
 
+        // Anti-enumeration: response is identical whether or not the account
+        // exists, so a mail failure must not surface an error here either.
         return response()->json([
-            'message' => 'If that email address is registered, you will receive a password reset link shortly.'
+            'message' => 'If an account exists for that email, a password reset link has been sent.'
         ]);
     }
 
