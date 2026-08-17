@@ -60,7 +60,7 @@ class SellerProductsOrdersCountTest extends TestCase
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->decimal('total_amount', 10, 2);
-            $table->enum('status', ['pending', 'approved', 'shipped', 'completed', 'cancelled'])->default('pending');
+            $table->enum('status', ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'])->default('pending');
             $table->text('shipping_address')->nullable();
             $table->string('payment_method')->default('cod');
             $table->text('notes')->nullable();
@@ -75,6 +75,16 @@ class SellerProductsOrdersCountTest extends TestCase
             $table->decimal('price', 10, 2);
             $table->timestamps();
         });
+
+        Schema::create('notifications', function ($table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->string('title');
+            $table->text('message');
+            $table->string('type')->default('order');
+            $table->boolean('is_read')->default(false);
+            $table->timestamps();
+        });
     }
 
     private function makeUser(string $email, string $role): User
@@ -86,6 +96,14 @@ class SellerProductsOrdersCountTest extends TestCase
             'role' => $role,
             'seller_status' => $role === 'seller' ? 'approved' : null,
         ]);
+    }
+
+    private function makeVerifiedCustomer(string $email): User
+    {
+        $customer = $this->makeUser($email, 'customer');
+        $customer->forceFill(['email_verified_at' => now()])->save();
+
+        return $customer;
     }
 
     public function test_seller_products_orders_column_reflects_orders(): void
@@ -252,5 +270,97 @@ class SellerProductsOrdersCountTest extends TestCase
         $this->assertNotNull($lampPayload);
         $this->assertSame(1, $lampPayload['order_items_count']);
         $this->assertNull($sellerBProducts->firstWhere('name', 'Mouse'));
+    }
+
+    public function test_cancelled_order_no_longer_counts_and_stock_is_restored(): void
+    {
+        $seller = $this->makeUser('sellerC@example.com', 'seller');
+        $customer = $this->makeVerifiedCustomer('customerC@example.com');
+
+        $mouse = Product::create([
+            'seller_id' => $seller->id,
+            'name' => 'Mouse',
+            'slug' => 'mouse',
+            'price' => 199.99,
+            'stock' => 10,
+            'status' => true,
+            'product_status' => 'approved',
+        ]);
+
+        // Order placed (checkout would have decremented stock to 9)
+        $order = Order::create([
+            'user_id' => $customer->id,
+            'total_amount' => 199.99,
+            'status' => 'pending',
+        ]);
+
+        $orderItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $mouse->id,
+            'quantity' => 1,
+            'price' => 199.99,
+        ]);
+
+        $mouse->decrement('stock', 1);
+
+        // Seller sees Orders = 1 while the order is valid
+        Sanctum::actingAs($seller);
+        $sellerView = collect($this->getJson('/api/products/my')->json());
+        $this->assertSame(1, $sellerView->firstWhere('name', 'Mouse')['order_items_count']);
+
+        // Customer cancels the order through the real endpoint
+        Sanctum::actingAs($customer);
+        $this->postJson("/api/orders/{$order->id}/cancel")
+            ->assertOk();
+
+        // Stock is restored to 10 (existing restoration behavior untouched)
+        $this->assertSame(10, $mouse->fresh()->stock);
+
+        // Cancelled order remains as historical record
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertNotNull(OrderItem::find($orderItem->id));
+
+        // Seller Orders count is back to 0
+        Sanctum::actingAs($seller);
+        $sellerViewAfter = collect($this->getJson('/api/products/my')->json());
+        $this->assertSame(0, $sellerViewAfter->firstWhere('name', 'Mouse')['order_items_count']);
+    }
+
+    public function test_cancelling_one_of_multiple_orders_reduces_count_by_exactly_one(): void
+    {
+        $seller = $this->makeUser('sellerD@example.com', 'seller');
+        $customer = $this->makeVerifiedCustomer('customerD@example.com');
+
+        $mouse = Product::create([
+            'seller_id' => $seller->id,
+            'name' => 'Mouse',
+            'slug' => 'mouse',
+            'price' => 199.99,
+            'stock' => 10,
+            'status' => true,
+            'product_status' => 'approved',
+        ]);
+
+        $orderOne = Order::create(['user_id' => $customer->id, 'total_amount' => 199.99, 'status' => 'pending']);
+        OrderItem::create(['order_id' => $orderOne->id, 'product_id' => $mouse->id, 'quantity' => 1, 'price' => 199.99]);
+
+        $orderTwo = Order::create(['user_id' => $customer->id, 'total_amount' => 199.99, 'status' => 'pending']);
+        OrderItem::create(['order_id' => $orderTwo->id, 'product_id' => $mouse->id, 'quantity' => 1, 'price' => 199.99]);
+
+        $mouse->decrement('stock', 2);
+
+        Sanctum::actingAs($seller);
+        $sellerView = collect($this->getJson('/api/products/my')->json());
+        $this->assertSame(2, $sellerView->firstWhere('name', 'Mouse')['order_items_count']);
+
+        // Cancel only the first order
+        Sanctum::actingAs($customer);
+        $this->postJson("/api/orders/{$orderOne->id}/cancel")->assertOk();
+
+        $this->assertSame(9, $mouse->fresh()->stock);
+
+        Sanctum::actingAs($seller);
+        $sellerViewAfter = collect($this->getJson('/api/products/my')->json());
+        $this->assertSame(1, $sellerViewAfter->firstWhere('name', 'Mouse')['order_items_count']);
     }
 }

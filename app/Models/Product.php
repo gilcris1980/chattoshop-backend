@@ -36,6 +36,10 @@ class Product extends Model
 
     public function getOrderItemsCountAttribute($value = null)
     {
-        return $value ?? $this->orderItems()->count();
+        return $value ?? $this->orderItems()
+            ->whereHas('order', function ($orderQuery) {
+                $orderQuery->where('status', '!=', 'cancelled');
+            })
+            ->count();
     }
 }
