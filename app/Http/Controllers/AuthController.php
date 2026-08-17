@@ -284,6 +284,14 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
+        if ($user && !$user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Your email is not yet verified. Please verify your email before requesting a password reset.',
+                'needs_verification' => true,
+                'email' => $user->email,
+            ], 403);
+        }
+
         if ($user) {
             try {
                 $token = Password::broker()->createToken($user);
@@ -301,6 +309,8 @@ class AuthController extends Controller
 
         // Anti-enumeration: response is identical whether or not the account
         // exists, so a mail failure must not surface an error here either.
+        // Intentional exception: unverified accounts are blocked (403) above,
+        // because a reset token must never be issued before email verification.
         return response()->json([
             'message' => 'If an account exists for that email, a password reset link has been sent.'
         ]);
