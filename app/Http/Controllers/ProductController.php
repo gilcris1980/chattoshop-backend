@@ -46,6 +46,7 @@ class ProductController extends Controller
     public function myProducts(Request $request)
     {
         $products = Product::with(['seller', 'category'])
+            ->withCount('orderItems')
             ->where('seller_id', $request->user()->id)
             ->latest()
             ->get();

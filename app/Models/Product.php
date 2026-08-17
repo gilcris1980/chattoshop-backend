@@ -34,8 +34,8 @@ class Product extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function getOrderItemsCountAttribute()
+    public function getOrderItemsCountAttribute($value = null)
     {
-        return $this->orderItems()->count();
+        return $value ?? $this->orderItems()->count();
     }
 }
