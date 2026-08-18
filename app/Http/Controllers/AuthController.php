@@ -284,33 +284,33 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if ($user && !$user->hasVerifiedEmail()) {
+        if (!$user) {
             return response()->json([
-                'message' => 'Your email is not yet verified. Please verify your email before requesting a password reset.',
+                'message' => 'This email address is not registered.'
+            ], 404);
+        }
+
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Please verify your email address before resetting your password.',
                 'needs_verification' => true,
                 'email' => $user->email,
             ], 403);
         }
 
-        if ($user) {
-            try {
-                $token = Password::broker()->createToken($user);
-                $user->sendPasswordResetNotification($token);
-            } catch (\Throwable $e) {
-                Log::error('Password reset email failed', [
-                    'user_id' => $user->id,
-                    'email' => $user->email,
-                    'exception' => get_class($e),
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-            }
+        try {
+            $token = Password::broker()->createToken($user);
+            $user->sendPasswordResetNotification($token);
+        } catch (\Throwable $e) {
+            Log::error('Password reset email failed', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
 
-        // Anti-enumeration: response is identical whether or not the account
-        // exists, so a mail failure must not surface an error here either.
-        // Intentional exception: unverified accounts are blocked (403) above,
-        // because a reset token must never be issued before email verification.
         return response()->json([
             'message' => 'If an account exists for that email, a password reset link has been sent.'
         ]);

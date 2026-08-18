@@ -59,9 +59,7 @@ class OrderController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $totalAmount = 0;
-        $orderItems = [];
-
+        $validatedItems = [];
         foreach ($request->items as $item) {
             if ($item['quantity'] <= 0) {
                 return response()->json(['message' => 'Invalid product quantity.'], 422);
@@ -88,43 +86,64 @@ class OrderController extends Controller
                 ], 400);
             }
 
-            $totalAmount += $product->price * $item['quantity'];
-            $orderItems[] = [
-                'product_id' => $product->id,
+            $validatedItems[] = [
+                'product' => $product,
                 'quantity' => $item['quantity'],
-                'price' => $product->price,
             ];
-
-            $product->decrement('stock', $item['quantity']);
         }
 
-        $order = Order::create([
-            'user_id' => $request->user()->id,
-            'total_amount' => $totalAmount,
-            'shipping_address' => $request->shipping_address,
-            'payment_method' => 'cod',
-            'notes' => $request->notes,
-            'status' => 'pending',
-        ]);
-
-        foreach ($orderItems as $item) {
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
-                'price' => $item['price'],
-            ]);
+        // Group items by seller so each seller gets their own order
+        $sellerGroups = [];
+        foreach ($validatedItems as $item) {
+            $sellerGroups[$item['product']->seller_id][] = $item;
         }
 
-        $this->createNotification($request->user()->id, 'Order Placed', 'Your order #' . $order->id . ' has been placed successfully.', 'order');
+        $orders = DB::transaction(function () use ($request, $sellerGroups) {
+            $createdOrders = [];
 
-        $sellerIds = Product::whereIn('id', collect($orderItems)->pluck('product_id'))->pluck('seller_id')->unique();
-        foreach ($sellerIds as $sellerId) {
-            $this->createNotification($sellerId, 'New Order', 'You have a new order #' . $order->id, 'order');
-        }
+            foreach ($sellerGroups as $sellerId => $groupItems) {
+                $totalAmount = 0;
+                foreach ($groupItems as $item) {
+                    $totalAmount += $item['product']->price * $item['quantity'];
+                }
+
+                $order = Order::create([
+                    'user_id' => $request->user()->id,
+                    'total_amount' => $totalAmount,
+                    'shipping_address' => $request->shipping_address,
+                    'payment_method' => 'cod',
+                    'notes' => $request->notes,
+                    'status' => 'pending',
+                ]);
+
+                foreach ($groupItems as $item) {
+                    OrderItem::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item['product']->id,
+                        'quantity' => $item['quantity'],
+                        'price' => $item['product']->price,
+                    ]);
+
+                    $item['product']->decrement('stock', $item['quantity']);
+                }
+
+                $this->createNotification($request->user()->id, 'Order Placed', 'Your order #' . $order->id . ' has been placed successfully.', 'order');
+                $this->createNotification($sellerId, 'New Order', 'You have a new order #' . $order->id, 'order');
+
+                $createdOrders[] = $order;
+            }
+
+            return $createdOrders;
+        });
+
+        $orders = Order::with(['user', 'items.product'])
+            ->whereIn('id', array_map(fn($order) => $order->id, $orders))
+            ->orderBy('id')
+            ->get();
 
         return response()->json([
-            'order' => $order->load(['user', 'items.product']),
+            'order' => $orders->first(),
+            'orders' => $orders,
             'message' => 'Order created successfully'
         ], 201);
     }
