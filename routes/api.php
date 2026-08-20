@@ -8,6 +8,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\CartController;
 
 /*
 |--------------------------------------------------------------------------
@@ -165,6 +166,22 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // DELETE ORDER (Admin only)
     Route::delete('/orders/{id}', [OrderController::class, 'destroy'])
         ->middleware('role:system_admin,admin');
+
+    /*
+    |--------------------------------------------------------------------------
+    | CART (Customer only)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/cart', [CartController::class, 'show']);
+
+    Route::post('/cart/items', [CartController::class, 'addItem']);
+
+    Route::put('/cart/items/{productId}', [CartController::class, 'updateQuantity']);
+
+    Route::delete('/cart/items/{productId}', [CartController::class, 'removeItem']);
+
+    Route::delete('/cart', [CartController::class, 'clear']);
 
     /*
     |--------------------------------------------------------------------------
