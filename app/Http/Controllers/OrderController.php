@@ -194,10 +194,10 @@ class OrderController extends Controller
         }
 
         $validTransitions = [
-            'pending'    => ['processing', 'cancelled'],
-            'processing' => ['shipped', 'cancelled'],
-            'shipped'    => ['delivered', 'cancelled'],
-            'delivered'  => ['completed', 'cancelled'],
+            'pending'    => ['processing'],
+            'processing' => ['shipped'],
+            'shipped'    => ['delivered'],
+            'delivered'  => ['completed'],
             'completed'  => [],
             'cancelled'  => [],
         ];
