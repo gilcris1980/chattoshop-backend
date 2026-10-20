@@ -15,7 +15,24 @@ class Order extends Model
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'archived_at' => 'datetime',
     ];
+
+    /**
+     * Orders that are not archived (normal admin/customer/seller listings).
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    /**
+     * Orders archived by a system admin (hidden from admin lists only).
+     */
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
 
     public function user(): BelongsTo
     {

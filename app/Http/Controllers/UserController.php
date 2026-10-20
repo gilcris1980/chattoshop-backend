@@ -53,7 +53,8 @@ class UserController extends Controller
             'total_products' => Product::count(),
             'total_categories' => Category::count(),
             'pending_orders' => Order::where('status', 'pending')->count(),
-            'recent_orders' => Order::with('user')->orderBy('created_at', 'desc')->limit(10)->get(),
+            // Counts include archived orders; only the recent lists hide them.
+            'recent_orders' => Order::with('user')->active()->orderBy('created_at', 'desc')->limit(10)->get(),
             'recent_users' => User::orderBy('created_at', 'desc')->limit(10)->get(),
             'order_stats' => [
                 'pending' => Order::where('status', 'pending')->count(),

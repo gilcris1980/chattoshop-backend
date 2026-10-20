@@ -154,6 +154,10 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     Route::post('/orders', [OrderController::class, 'store']);
 
+    // NOTE: static paths like /orders/stats must be registered BEFORE
+    // /orders/{id}, otherwise {id} captures them and they 404.
+    Route::get('/orders/stats', [OrderController::class, 'stats']);
+
     Route::get('/orders/{id}', [OrderController::class, 'show']);
 
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus'])
@@ -161,11 +165,13 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
 
-    Route::get('/orders/stats', [OrderController::class, 'stats']);
+    // ARCHIVE ORDER (System Admin only — cancelled orders only)
+    Route::post('/orders/{id}/archive', [OrderController::class, 'archive'])
+        ->middleware('role:system_admin');
 
-    // DELETE ORDER (Admin only)
-    Route::delete('/orders/{id}', [OrderController::class, 'destroy'])
-        ->middleware('role:system_admin,admin');
+    // NOTE: DELETE /orders/{id} (permanent order + order_items deletion) has
+    // been intentionally removed. Orders are archived via the endpoint above,
+    // never permanently deleted.
 
     /*
     |--------------------------------------------------------------------------

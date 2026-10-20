@@ -17,16 +17,31 @@ class OrderController extends Controller
         $user = $request->user();
 
         if ($user->isAdmin()) {
+            // Admin list excludes archived orders (customers/sellers still see them).
             $orders = Order::with(['user', 'items.product'])
+                ->active()
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
         } elseif ($user->isSeller()) {
             $sellerProductIds = Product::where('seller_id', $user->id)->pluck('id');
             $orderIds = OrderItem::whereIn('product_id', $sellerProductIds)->pluck('order_id')->unique();
-            
+
+            // Seller order list priority: pending first, cancelled last, newest first
+            // within each status. Sorting is done in SQL so it stays correct across
+            // all paginated pages. CASE WHEN is portable across MySQL/Postgres/SQLite.
+            $statusPriority = "CASE status"
+                . " WHEN 'pending' THEN 1"
+                . " WHEN 'processing' THEN 2"
+                . " WHEN 'shipped' THEN 3"
+                . " WHEN 'delivered' THEN 4"
+                . " WHEN 'completed' THEN 5"
+                . " ELSE 6 END";
+
             $orders = Order::with(['user', 'items.product'])
                 ->whereIn('id', $orderIds)
+                ->orderByRaw($statusPriority . ' ASC')
                 ->orderBy('created_at', 'desc')
+                ->orderBy('id', 'desc')
                 ->paginate(10);
         } else {
             $orders = Order::with(['user', 'items.product'])
@@ -264,13 +279,48 @@ class OrderController extends Controller
     public function cancel($id)
     {
         $order = Order::findOrFail($id);
+        $user = request()->user();
 
-        // Only the order owner can cancel
-        if ($order->user_id !== request()->user()->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // Order owners (customers) keep their existing cancellation behaviour unchanged.
+        $isOwner = $order->user_id === $user->id;
+
+        if (!$isOwner) {
+            // Sellers may cancel, but only orders that contain exclusively their own products.
+            if (!$user->isSeller()) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            if ($user->seller_status === 'pending') {
+                return response()->json([
+                    'message' => 'Your account is pending administrator approval.'
+                ], 403);
+            }
+
+            $sellerProductIds = Product::where('seller_id', $user->id)
+                ->pluck('id')
+                ->map(fn ($productId) => (int) $productId)
+                ->all();
+
+            $orderProductIds = OrderItem::where('order_id', $order->id)
+                ->pluck('product_id')
+                ->map(fn ($productId) => (int) $productId)
+                ->all();
+
+            if (array_intersect($orderProductIds, $sellerProductIds) === []) {
+                return response()->json([
+                    'message' => 'Unauthorized - This order does not contain your products'
+                ], 403);
+            }
+
+            // Multi-seller safety: never cancel an order that holds another seller's items.
+            if (array_diff($orderProductIds, $sellerProductIds) !== []) {
+                return response()->json([
+                    'message' => 'This order contains items from another seller and cannot be cancelled.'
+                ], 403);
+            }
         }
 
-        // Only pending orders can be cancelled by customer
+        // Enforced server-side: only pending orders can be cancelled, by anyone.
         if ($order->status !== 'pending') {
             return response()->json(['message' => 'Cannot cancel order with status: ' . $order->status . '. Only pending orders can be cancelled.'], 400);
         }
@@ -289,6 +339,41 @@ class OrderController extends Controller
         );
 
         return response()->json(['message' => 'Order cancelled successfully']);
+    }
+
+    public function archive(Request $request, $id)
+    {
+        // System admins only (route middleware enforces this as well).
+        if (!$request->user() || !$request->user()->isSystemAdmin()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $order = Order::findOrFail($id);
+
+        // Only cancelled orders may be archived — pending orders may still
+        // require fulfilment and everything else is still in progress.
+        if ($order->status !== 'cancelled') {
+            return response()->json([
+                'message' => 'Only cancelled orders can be archived. Current status: ' . $order->status . '.'
+            ], 400);
+        }
+
+        // Duplicate submission guard.
+        if ($order->archived_at !== null) {
+            return response()->json([
+                'message' => 'This order is already archived.'
+            ], 400);
+        }
+
+        // Archive only stamps archived_at. No status, stock, payment or
+        // notification changes, and nothing is ever deleted.
+        $order->archived_at = now();
+        $order->save();
+
+        return response()->json([
+            'order' => $order->load(['user', 'items.product']),
+            'message' => 'Order archived successfully'
+        ]);
     }
 
     public function destroy($id)
@@ -329,6 +414,9 @@ class OrderController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
         
+        // NOTE: counts/sums below are all-time and intentionally include
+        // archived orders (archived orders are still real financial records;
+        // only admin *lists* hide them). Only recent_orders excludes them.
         return response()->json([
             'total_orders' => Order::count(),
             'total_revenue' => Order::whereIn('status', ['delivered', 'completed'])->sum('total_amount'),
@@ -341,7 +429,7 @@ class OrderController extends Controller
                 'completed' => Order::where('status', 'completed')->count(),
                 'cancelled' => Order::where('status', 'cancelled')->count(),
             ],
-            'recent_orders' => Order::with('user')->latest()->limit(10)->get(),
+            'recent_orders' => Order::with('user')->active()->latest()->limit(10)->get(),
         ]);
     }
 
@@ -350,11 +438,12 @@ class OrderController extends Controller
         $user = $request->user();
 
         if ($user->isAdmin()) {
+            // Counts include archived orders; only recent_orders hides them.
             return response()->json([
                 'total_orders' => Order::count(),
                 'total_sales' => Order::whereIn('status', ['delivered', 'completed'])->sum('total_amount'),
                 'pending_orders' => Order::where('status', 'pending')->count(),
-                'recent_orders' => Order::with('user')->latest()->limit(5)->get(),
+                'recent_orders' => Order::with('user')->active()->latest()->limit(5)->get(),
             ]);
         } elseif ($user->isSeller()) {
             $sellerProductIds = Product::where('seller_id', $user->id)->pluck('id');
